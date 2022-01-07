@@ -1,0 +1,644 @@
+---
+title: "LA BANDA SONORA DEL 2021"
+subtitle: "Carlos García Castilla(garcas8@alumni.uv.es)" #- pongo tú nombre ahí para q aparezca más grande q el de la UV
+author: "Universitat de València"
+date: "Diciembre de 2021 (actualizado el `r format(Sys.time(), '%d-%m-%Y')`)"
+output:
+  html_document:
+    css: "./assets/my_css_file.css"
+    theme: paper
+    highlight: textmate 
+    toc: true
+    toc_depth: 3 
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    self_contained: true
+    number_sections: false
+    df_print: kable
+    code_download: true
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r packages-setup, include = FALSE}
+library(tidyverse)
+library(klippy)  #- remotes::install_github("rlesur/klippy")
+library(knitr)
+library(tidyverse)
+library(rio)
+library(klippy)
+library(knitr)
+library(readr)
+library(here)
+library(janitor)
+library(skimr)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(gapminder)
+library(plotly)
+library(wordcloud2)
+library(highcharter)
+library(d3treeR)
+library(magick)
+library(gt)
+library(kableExtra)
+```
+
+```{r chunk-setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, 
+                      #results = "hold",
+                      cache = FALSE, cache.path = "/caches/", comment = "#>",
+                      #fig.width = 7, #fig.height= 7,   
+                      #out.width = 7, out.height = 7,
+                      collapse = TRUE,  fig.show = "hold",
+                      fig.asp = 0.628, out.width = "75%", fig.align = "center")
+knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
+```
+
+
+```{r options-setup, include = FALSE}
+options(scipen = 999) #- para quitar la notación científica
+options("yaml.eval.expr" = TRUE) 
+```
+
+
+```{r klippy, echo = FALSE}
+klippy::klippy(position = c("top", "right")) #- remotes::install_github("rlesur/klippy")
+```
+
+<div style="text-align: justify"><div/>
+
+<hr class="linea-black">
+
+<!-- El párrafo de abajo has de dejarlo casi igual, solo HAS de SUSTITUIR "perezp44" por tu usuario de Github-->
+Trabajo elaborado para la asignatura "Programación y manejo de datos en la era del Big Data" de la Universitat de València durante el curso 2021-2022. El repo del trabajo está [aquí](https://github.com/garcas8/trabajo_BigData){target="_blank"}. 
+
+<!-- El párrafo de abajo has de dejarlo exactamente igual, NO HAS DE CAMBIAR NADA-->
+
+La página web de la asignatura y los trabajos de mis compañeros pueden verse [aquí](https://perezp44.github.io/intro-ds-21-22-web/07-trabajos.html){target="_blank"}.
+
+
+<hr class="linea-red">
+
+# [1. Introducción]{.verdecito}
+
+**Spotify** es el **servicio digital** de música, podcasts y vídeos, más utilizado actualmente a nivel mundial.En esta aplicación podras encontrar millones de canciones para todos los gustos, al igual que podcasts, ya que hay de todo tipo, de política, de economía de deportes, etc. En este trabajo, vamos a tratar varios temas sobre esta aplicación, en primer lugar, haremos un repaso sobre la evolución de Spotify a lo largo de los años, después nos adentraremos más en lo que más se ha escuchado en 2021 y comparaciones entre los distintos generos, y por último, nos referiremos más a aspectos musicales de las canciones, como la bailabilidad, la popularidad, los acordes...
+Al final de año, Spotify, muestra a sus usuarios un resumen de lo que mas ha escuchado durante ese año,de una forma interactiva y divertida, y de aqui es de donde me surgió la idea de realizar el trabajo sobre esta plataforma, a continuación podeis observar cual ha sido mi resumen de 2021
+
+<center>
+
+![Wrapped](./imagenes/wrapped.jpeg){width=300 height=500}
+
+</center>
+
+
+
+
+# 2. Datos
+
+Los datos que he utilizado en este trabajo, han sido extraidos de [kaggle](https://www.kaggle.com/) en esta web he obtenido los datos sobre las canciones más escuhadas este 2021, de la propia web de [Spotify](https://www.spotify.com/es/) aquí he extraido la información sobre los seguidores de los artistas y de [Statista](https://www.statista.com/topics/2075/spotify/#dossierKeyfigures) de esta web he sacado los datos sobre la evolución de los ingresos y de los oyentes.
+
+
+## 2.1. Procesando los datos
+
+En este apartado voy a mostrar como he manipulado los 4 dataframes, y que acciones he realizado en cada uno de ellos para eliminar fallos y dejarlos más organizados y con la información que me interesa.El df principal es el llamado **spotify_dataset** ya que este ha sido el que mas he manipulado, el que mas he utilizado y el que más in formación tiene.Los otros 3 df, **evolucion_usuarios, evolucion_ingresos, mas_seguidores* han sido más complementarios, ya que solo me han servido para hacer 2-3 gráficos.
+
+```{r, eval = TRUE, echo = TRUE}
+#cambio estos nombres aqui debajo pq si no da error luego
+
+spotify_dataset <- rio::import(file = "./datos/spotify_dataset.csv")
+
+names(spotify_dataset)[names(spotify_dataset) == 'Artist Followers'] <- 'artist_followers'
+names(spotify_dataset)[names(spotify_dataset) == 'Song Name'] <- 'song_name'
+
+spotify_dataset$song_name <- iconv(spotify_dataset$song_name, from="UTF-8", to="LATIN1")
+spotify_dataset$Artist <- iconv(spotify_dataset$Artist, from="UTF-8", to="LATIN1")
+
+spotify_dataset$Streams <- as.numeric(gsub(",","",spotify_dataset$Streams))
+
+
+spotify_dataset[is.na(spotify_dataset)] <- 0
+
+
+
+evolucion_usuarios <- read_excel("datos/evolucion_usuarios.xlsx")
+
+evolucion_ingresos <- read_excel("datos/evolucion_ingresos.xlsx")
+
+mas_seguidores <- read_excel("datos/followers_artists_2021.xlsx") 
+```
+
+# 3. La evolución de Spotify
+
+**Spotify** es una aplicación que permite la reproducción de audio y video por medio del streaming, es decir, la transmisión en continuo de música o listas de música de distintos artistas alrededor del mundo.Este software multiplataforma, de origen sueco, cuenta con una versión gratuita que permite escuchar música de forma gratuita, con algunas limitaciones y publicidades. También, cuenta con otra modalidad Premium que ofrece mejor calidad de audio y otras funciones adicionales que funcionan con una suscripción de paga.
+
+En este apartado, vamos a observar su evolución en distintos aspectos.
+
+
+## 3.1 Evolución de los usuarios por año y trimestre
+
+Conforme ha ido avanzando los smartphones y la tecnología,**Spotify** ha ido aumentando sus usuarios, ya que unicamente teniendo conexión a internet, te permite acceso ilimitado a miles de canciones.
+
+```{r, eval = TRUE, echo = TRUE}
+
+evolucion_usuarios <- read_excel("datos/evolucion_usuarios.xlsx")
+
+gg_usuarios <- ggplot(evolucion_usuarios, aes(x = year_trimester, y = usuarios )) +
+  geom_segment( aes(x=year_trimester, xend=year_trimester, y=0, yend=usuarios), size=0.5, 
+                color="black", linetype="dotdash") +
+  geom_point( color="chartreuse3", size=3.5) +
+  theme_light() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.border = element_blank(),
+    axis.ticks.x = element_blank()) +
+  xlab("Año y trimestre ") +
+  ylab("Numero de Usuarios en millones")
+  
+
+ggplotly(gg_usuarios)   
+
+
+
+
+```
+
+## 3.2 Evolución de los ingresos por año 
+
+Conforme **Spotify** ha ido aumentando los usuarios, también ha ido aumentando sus ingresos, ya que gran parte de estos nuevos usuarios se han unido de forma premium, lo que conlleva un pago mensual o anual a la plataforma, por ello, contra más usuarios nuevos, mayores ingresos.
+
+
+```{r, eval = TRUE, echo = TRUE}
+
+
+evolucion_ingresos <- read_excel("datos/evolucion_ingresos.xlsx")
+
+
+gg_ingresos <- ggplot(evolucion_ingresos, aes(x=year, y= ingresos)) +
+  geom_area() +
+  geom_point( size=1.5, color="chartreuse3", fill=alpha("chartreuse3", 8), shape=21, stroke=2) +  
+  geom_line(color="chartreuse3", size=1.5) +
+  scale_x_continuous(
+    breaks = seq(2009, 2020, 1),
+    limits = c(2009, 2020)) + labs(x = "Año", y = "Ingresos en millones de €" ) + theme(panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(colour = "white"),
+    panel.background = element_rect(fill = "white"))
+
+
+ggplotly(gg_ingresos)
+
+```
+
+
+
+## 3.2 Los logos de spotify a lo largo de su historia
+
+Aunque no sea algo de vital importancia, **Spotify** a lo largo de los años, como cualquier marca, ha realizado modificaciones en el logo, haciendo cada vez más simples y menos recargados
+
+
+```{r}
+
+logo2008 <- image_read("./imagenes/spotify-logo2008.png") %>% image_scale(., "500") %>%  image_annotate(., "2008", size = 40, gravity = "southeast", color = "black")
+
+logo2013 <- image_read("./imagenes/spotify_logo_2013.png") %>% image_scale(., "900") %>%  image_annotate(., "2013", size = 80, gravity = "southeast", color = "black")
+
+logo2015 <- image_read("./imagenes/spotify_logo_actual.png") %>% image_scale(., "500") %>%  image_annotate(., "Actual", size = 40, gravity = "southeast", color = "black")
+
+logos <- c(logo2008, logo2013, logo2015)
+
+image_animate(image_scale(logos), fps = 0.5)
+```
+
+# 4. La música del 2021
+
+En esta sección hablaré de lo que más se ha escuchado en el último año, los artistas más sonados, los más seguidos y las canciones más famosas.
+
+
+## 4.1 TOP 30 Artistas del 2021 {.tabset}
+
+Como podemos observar, la artista más escuchada, en este 2021 ha sido la cantante estadounidense, **Taylor Swift**, con un total de 381480455 reproducciones.Por detrás, tenemos a la banda surcoreana de K-Pop, **BTS** con 238400020 reproducciones, y en tercer lugar, podemos encontrar al canadiense **Justin Bieber** con 225842427 reproducciones.
+
+### GRÁFICO DE BARRAS
+
+```{r, eval = TRUE, echo = TRUE}
+
+total_streams_art <- spotify_dataset %>% 
+  group_by(Artist) %>% 
+  mutate(streams_totales = sum(Streams)) %>% 
+  select(Artist, streams_totales, Genre)
+
+total_streams_art_nodup <- total_streams_art[!duplicated(total_streams_art), ] %>% 
+  group_by(streams_totales) %>% 
+  arrange(desc(streams_totales)) %>% 
+  filter(streams_totales > 46346067)
+
+
+treinta_mas_escuchados <- total_streams_art_nodup[-c(4, 15, 19, 21, 23
+                                                     , 25, 27, 33, 41), ]
+
+treinta_mas_escuchados_no_dup <- treinta_mas_escuchados[-c(27, 32 ,33 ,34), ]
+
+
+gg_masescuchados <- ggplot(treinta_mas_escuchados_no_dup, aes(x= Artist, 
+                                                              y= streams_totales, fill=Artist)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme(legend.position="none") + theme(panel.background = element_rect(fill = "white")) +labs(y = "Streams Totales")
+  
+ggplotly(gg_masescuchados)
+
+
+
+
+
+
+```
+
+### GRÁFICO CIRCULAR
+
+```{r, eval = TRUE, echo = TRUE}
+
+
+# Set highcharter options
+options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
+
+gg_masescuchados_circ <- treinta_mas_escuchados_no_dup %>%
+  hchart(
+    "pie", hcaes(x = Artist, y = streams_totales),
+    name = "Nº de reproducciones"
+  )
+
+gg_masescuchados_circ
+
+
+
+
+```
+
+
+
+
+
+
+## 4.2 TOP 30 Artistas con más seguidores en spotify del 2021
+
+En este gráfico de tarta, se puede ver que los artistas más seguidos, **NO** son los más escuchados, ya que los 3 con más fans en esta plataforma, son Ed Sheeran, Ariana Grande y Drake. Cuando Taylor Swift ha sido la más escuchada, pero la 7 más seguida, lo mismo pasa con BTS que ha pasado de ser el segundo a el décimo primero.Esto es porque el hecho de que sean más escuchados no significa que sean los más famosos, solo significa que han sacado más canciones en 2021 o mejor contenido.
+
+
+```{r, eval = TRUE, echo = TRUE}
+
+mas_seguidores <- read_excel("datos/followers_artists_2021.xlsx") 
+
+
+# Set highcharter options
+options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
+
+gg_masseguidores <- mas_seguidores %>%
+  hchart(
+    "pie", hcaes(x = Artist, y = artist_followers),
+    name = "Nº de seguidores"
+  )
+
+gg_masseguidores
+
+
+
+```
+
+
+
+## 4.3 TOP 30 canciones más sonadas en este 2021 ¨{.tabset}
+
+Como podemos observar en este gráfico de caja las canciones más escuchadas en 2021 han sido, en primer lugar, **Beggin'** del grupo italiano Måneskin con 48633449 reproducciones, esta canción fue la ganadora de Eurovision.En segundo lugar, esta **STAY (with Justin Bieber)** del rapero australiano The Kid LAROI y este tema, acumula 47248719 reproducciones en Spotify. Y en tercer lugar, la canción, **good 4 u** de la americana Olivia Rodrigo que tiene 40162559 reproducciones.
+
+### POR CANCIONES DENTRO DEL TOP 30
+
+```{r, eval = TRUE, echo = TRUE, include = FALSE}
+top10 <- spotify_dataset %>% select(song_name, Artist, Streams) %>% 
+ arrange(desc(Streams)) %>% filter(Streams > 15967985)
+
+library(treemap)
+
+
+
+
+gg_top10 <- treemap(top10,
+                            index=c("Artist","song_name"),
+                            vSize="Streams",
+                            type="index",
+                            vColor = "Artist",
+                            fontsize.labels=c(15,20),
+                            bg.labels=c("transparent"),
+                            palette = "Set1",
+                            align.labels=list(
+                              c("center", "center"), 
+                              c("center", "bottom")),
+                            title = "TOP 10 2021",
+                            title.legend = "Artistas") 
+
+gg_top10
+
+```
+
+```{r, eval = TRUE, echo = TRUE}
+
+#top10 <- spotify_dataset %>% select(song_name, Artist, Streams) %>% 
+ # filter(Streams > 14174752)
+
+#library(treemap)
+
+#gg_top_10 <- treemap(top10,
+ #       index="group",
+  #      vSize="value",
+   #     type="index")
+
+
+#gg_top10 <- treemap(top10,
+                            #index=c("Artist","song_name"),
+                            #vSize="Streams",
+                            #type="index",
+                            #vColor = "Artist",
+                            #fontsize.labels=c(15,20),
+                            #bg.labels=c("transparent"),
+                            #palette = "Set1",
+                            #align.labels=list(
+                             # c("center", "center"), 
+                            #  c("center", "bottom")),
+                            #title = "TOP 10 2021",
+                            #title.legend = "Artistas") 
+
+#gg_top10
+
+
+
+```
+
+```{r, fig.align='center', eval = TRUE, echo = TRUE}
+
+inter_top10 <- d3tree2(gg_top10 ,  rootname = "TOP 30 Canciones más escuchadas del 2021 y sus Artistas")
+inter_top10
+
+
+```
+
+### TABLA RANKING TOP 30
+
+```{r, eval = TRUE, echo = TRUE}
+
+knitr::kable(top10, caption = "TOP 30 2021") %>% 
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))  %>% 
+  kableExtra::kable_styling(fixed_thead = list(enabled = T, background = "chartreuse"))
+
+```
+
+# 5. Reggaeton vs POP
+
+Según varias fuentes de información, los dos generos más escuchados en la actualidad son el pop y el reggaeton.En este apartado vamos a comparar los dos generos mediante distintos aspectos, la suma de todas las reproducciones de cada género en 2021, la bailabilidad de cada género y la popularidad.
+
+## 5.1 Que género ha tenido más reproducciones en 2021
+
+Para comparar hemos sumado todas las reproducciones de las canciones de pop en 2021.En este gráfico de barras podemos ver, que el pop se ha escuchado mucho más que el reggaeton durante este año.
+
+```{r, eval = TRUE, echo = TRUE}
+reggaeton <- spotify_dataset %>% 
+  select(Artist, song_name, Streams, Genre, Popularity, Danceability, Energy) %>%
+  filter(stringr::str_detect(Genre, 'reggaeton') ) %>% 
+  mutate(streams_totales = sum(Streams)) 
+
+
+pop <- spotify_dataset %>% 
+  select(Artist, song_name, Streams, Genre, Popularity, Danceability, Energy) %>%
+  filter(stringr::str_detect(Genre, 'pop') ) %>% 
+  mutate(streams_totales = sum(Streams))
+
+
+reggaeton_vs_pop <- rbind(reggaeton, pop) %>% 
+  select(Genre, streams_totales)
+
+reggaeton_vs_pop_solo_streams <- reggaeton_vs_pop[c(29,185), ]
+
+
+gg_vs_streams <- ggplot(reggaeton_vs_pop_solo_streams, aes(x=Genre, y=streams_totales, 
+                                                           fill = streams_totales)) + 
+  geom_bar(stat = "identity") +
+  theme(panel.background = element_rect(fill = "white")) +labs(x = "Genero", y = "Streams Totales")
+
+
+ggplotly(gg_vs_streams)
+
+```
+
+
+## 5.2 Que género ha sido más bailable en 2021
+
+Para llevar a cabo esta comparación, he realizado la media de la bailabilidad de todas las canciones de cada género, es decir, he sumado la bailabilidad de todas las canciones de pop y de reggaeton, y lo he dividido entre el nº de temas de cada uno .Y como podemos observar, las canciones de reggaeton han sido más bailables que las de pop en un 8%.
+
+```{r, eval = TRUE, echo = TRUE}
+
+reggaeton_baila <- reggaeton %>% summarise(media_bailabilidad = mean(Danceability))
+
+pop_baila <- pop %>% summarise(media_bailabilidad = mean(Danceability))
+
+reggaeton_vs_pop_baila <- rbind(reggaeton_baila, pop_baila)
+
+reggaeton_vs_pop_baila_bien <- cbind(reggaeton_vs_pop_baila, Genre=c("reggaeton","pop"))
+
+gg_vs_baila <- ggplot(reggaeton_vs_pop_baila_bien, aes(x=Genre, y=media_bailabilidad, 
+                                                           fill = media_bailabilidad)) + 
+  geom_bar(stat = "identity")  + theme(panel.background = element_rect(fill = "white")) +labs(x = "Genero", y = "Media de Bailabilidad")
+
+
+
+ggplotly(gg_vs_baila)
+
+
+```
+
+
+## 5.3 Que género ha sido más popular en 2021
+
+Para realizar esta comparación, hemos sumado la popularidad de todas las canciones de cada género y lo hemos dividido entre el nº de canciones de cada uno.Tras observar el gráfico, podemos obtener una conclusión, las canciones de reggaeton son más populares que las de pop normalmente.
+
+
+```{r, eval = TRUE, echo = TRUE}
+
+reggaeton_popu <- reggaeton %>% summarise(media_popularidad = mean(Popularity))
+
+pop_popu <- pop %>% summarise(media_popularidad = mean(Popularity))
+
+reggaeton_vs_pop_popu <- rbind(reggaeton_popu, pop_popu)
+
+reggaeton_vs_pop_popu_bien <- cbind(reggaeton_vs_pop_popu, Genre=c("reggaeton",
+                                                                     "pop"))
+
+gg_vs_popu <- ggplot(reggaeton_vs_pop_popu_bien, aes(x=Genre, y=media_popularidad, 
+                                                       fill = media_popularidad)) + 
+  geom_bar(stat = "identity") +
+  theme(panel.background = element_rect(fill = "white")) +labs(x = "Genero", y = "Media de la Popularidad")
+
+
+ggplotly(gg_vs_popu)
+
+```
+
+
+# 6. Aspectos musicales del 2021
+
+En este apartado observaremos varias características que tienen que ver con la música, como es el **tempo**, los **acordes**, la **energía** y la **bailabilidad**
+
+## 6.1 Que tempo deben tener las canciones para ser bailables?
+
+Como podemos observar en este gráfico de dispersión, las canciones para ser bailables (danceability>= 0,75), han de tener un tempo entre 100 y 150, si tienen un tempo mayor son demasiado rápidas para ser bailadas por tanto su bailabilidad cae, y si tienen un tempo menor que 100, son demasiado lentas.
+
+```{r, eval = TRUE, echo = TRUE}
+
+
+gg_1 <- ggplot(spotify_dataset) + geom_point(mapping = aes(x=Tempo, y=Danceability), colour = "chartreuse3") + 
+  geom_smooth(mapping = aes(x=Tempo, y=Danceability), color = "black") + 
+  labs(title="Tempo de la canción vs Bailabilidad") +
+  theme(panel.background = element_rect(fill = "white")) +labs(y = "Bailabilidad")
+ggplotly(gg_1)
+
+
+
+```
+
+
+## 6.2 Que energia suelen tener las canciones más bailables?
+
+Las canciones más bailables, según el gráfico de dispersion, suelen tener unas energía entre 0,60 y 0,75. Si las canciones tienen una energía menor, no incitan al movimiento y por tanto, tienen una bailabilidad muy baja
+
+
+```{r, eval = TRUE, echo = TRUE}
+
+gg_2 <- ggplot(spotify_dataset) + geom_point(mapping = aes(x=Energy, y=Danceability), colour = "chartreuse3") + 
+  geom_smooth(mapping = aes(x=Energy, y=Danceability), color = "black") + 
+  labs(title="Energía de la canción vs Bailabilidad") +
+  theme(panel.background = element_rect(fill = "white")) +labs(x = "Energía de la Canción", y = "Bailabilidad")
+ggplotly(gg_2)
+
+
+
+```
+
+
+## 6.3 Las canciones más populares son las más bailables?
+
+La respuesta a esta pregunta es si, ya que como podemos ver, las canciones con una popularidad por encima de 75, que esto significa que son canciones populares a nivel mundial y que han estado en los tops varias veces, tienen una bailabilidad por encima de 0,65, es decir, que si son populares son bastante bailables, ya que estos significa que su ritmo, su letra y su melodia son más pegadizas.
+
+```{r, eval = TRUE, echo = TRUE}
+
+gg_3 <- ggplot(spotify_dataset) + geom_point(mapping = aes(x=Danceability, y=Popularity), colour = "chartreuse3") + 
+  geom_smooth(mapping = aes(x=Danceability, y=Popularity), color = "black") + 
+  labs(title="Popularidad vs Bailabilidad") +
+  theme(panel.background = element_rect(fill = "white")) +labs(x = "Bailabilidad", y = "Popularidad")
+ggplotly(gg_3)
+
+
+```
+
+
+## 6.4 Que acorde usan las canciones más populares?
+
+En este gráfico de barras se puede observar que, las canciones con mayor popularidad son las que utilizan el acorde **C#/Db**, y las que menos populares son las que utilizan el acorde **D#/Eb**.
+
+```{r, eval = TRUE, echo = TRUE}
+
+
+gg_4 <- ggplot(spotify_dataset, aes(x=Chord, y=Popularity)) + 
+  geom_bar(stat = "identity", color ="black" ,fill = "chartreuse3") +
+
+ theme(panel.background = element_rect(fill = "white")) +labs(title = "Popularidad vs Acorde", x = "Acorde",
+    y = "Popularidad")
+gg_4
+
+
+```
+
+
+# 7. Reggaeton en el 2021
+
+En los ultimos años, este género musical ha ido aumentando su popularidad a niveles estratosféricos, ha pasado de ser solo escuchado en paises latinos, ha ser uno de los más famosos a nivel mundial.Este año, los 3 artistas de reggaeton más importantes han sido Bad Bunny, Rauw Alejandro y J Balvin.
+
+```{r, eval = TRUE, echo = TRUE}
+
+bb_ra_j <- spotify_dataset %>% 
+  select(Artist, Streams, artist_followers, song_name, `Number of Times Charted`) %>% 
+  filter(Artist %in% c("Bad Bunny", "Rauw Alejandro","J Balvin"))
+
+total_streams_bb_ra_j <- treinta_mas_escuchados[c(5,31,32), ] %>% 
+  select(Artist, streams_totales)
+
+comparacion_reggaeton <- full_join(bb_ra_j,total_streams_bb_ra_j, c("Artist" = "Artist")) %>% 
+  select(Artist,streams_totales,artist_followers) 
+
+comparacion_reggaeton_3 <- comparacion_reggaeton[c(1,2,7), ]
+
+comparacion_reggaeton_edad <- cbind(comparacion_reggaeton_3, Edad=c("27","28", "36"))
+
+
+
+fotos_reggaeton_artistas <- c("./imagenes/bad_bunny.png", "./imagenes/rauw_alejandro.png","./imagenes/j_balvin.png")
+
+fotos_pr_col <- c("./imagenes/Puerto_Rico.png","./imagenes/Puerto_Rico.png", "./imagenes/Colombia.png")
+
+comparacion_reggaeton_bien <- comparacion_reggaeton_edad %>% add_column(fotos_reggaeton_artistas, fotos_pr_col)
+
+library(gt)
+
+reggaeton_tabla <- comparacion_reggaeton_bien %>% gt() %>% 
+  text_transform( locations = cells_body(columns = c(fotos_reggaeton_artistas)), fn = function(x) {gt::local_image(x, height = 80)}) %>% 
+  text_transform( locations = cells_body(columns = c(fotos_pr_col)), fn = function(x) {gt::local_image(x, height = 80)}) %>% tab_header(title = md("**TOP ARTISTAS REGGAETON 2021**"), subtitle = md("Comparación")) %>%   cols_label(
+    Artist = html("Artista"),
+    streams_totales = html("Total Reproducciones"),
+    artist_followers = html("Seguidores Spotify"),
+    fotos_reggaeton_artistas = html(""),
+    fotos_pr_col = html("")) %>%  
+  tab_options(table.background.color = "white",   table.font.color.light = "chartreuse") %>% 
+  cols_align(align = "center",
+  columns = everything())
+
+reggaeton_tabla
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 4. Bibliografía
+
+- [Página web de la asignatura.](https://perezp44.github.io/intro-ds-21-22-web/04-tutoriales.html)
+
+- [Kaggle sobre Spotify.](https://www.kaggle.com/sashankpillai/spotify-top-200-charts-20202021)
+
+- [Statista.](https://www.statista.com/topics/2075/spotify/#dossierKeyfigures)
+
+- [Datos Spotify Semanales.](https://spotifycharts.com/regional)
+
+<br><br>
+
+<hr class="linea-red">
+<hr class="linea-red">
+
+
+
+
+<br><br>
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
+<br><br>
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
